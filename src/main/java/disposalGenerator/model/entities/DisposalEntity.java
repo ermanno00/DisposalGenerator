@@ -1,24 +1,24 @@
-package disposal;
+package disposalGenerator.model.entities;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.ToString;
 
-import java.io.Serializable;
-import java.util.Date;
+
+import java.time.LocalDate;
 import java.util.UUID;
 
-@Data
+
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
-public class DisposalDriver implements Serializable {
-    private String id;
-    private Date date;
+@Data
+public class DisposalEntity {
+
+    private UUID id;
+    private String externalId;
+    private LocalDate localDate;
     private String typeOfDisposal;
-    private Integer capacity;
+    private int capacity;
     private UUID collectedAt;
     private UUID collectedBy;
-
 }
