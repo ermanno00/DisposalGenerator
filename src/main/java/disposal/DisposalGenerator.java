@@ -35,7 +35,7 @@ public class DisposalGenerator {
             queue = session.createQueue(queueName);
             QueueSender sender = session.createSender(queue);
 
-            System.out.println();
+            System.out.println("Connesso");
 
 //            for(int i=0; i<1;i++){
 //                DisposalDriver disposalDriver = new DisposalDriver(
