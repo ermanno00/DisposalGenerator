@@ -3,13 +3,11 @@ package disposalGenerator.disposal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import disposalGenerator.configuration.Configuration;
-import disposalGenerator.gui.MainFrame;
+import disposalGenerator.GUI.MainFrame;
 import disposalGenerator.model.MongoDAO;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
 import disposalGenerator.model.entities.Coordinates;
 import disposalGenerator.model.entities.ItineraryEntity;
-import disposalGenerator.model.entities.TypeOfDisposal;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.activemq.artemis.jms.client.ActiveMQQueueConnectionFactory;
 
 import javax.jms.*;
