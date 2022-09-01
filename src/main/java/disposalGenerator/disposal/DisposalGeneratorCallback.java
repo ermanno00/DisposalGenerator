@@ -14,5 +14,7 @@ public interface DisposalGeneratorCallback {
     void onRoutes(List<ItineraryEntity> itineraryEntities);
     void onCollectionPoint(List<CollectionPointStatusEntity> collectionPointStatusEntities);
 
+    void onRescheduledUpdateData(int timeSeconds);
+
 
 }

@@ -11,7 +11,7 @@ import java.util.UUID;
 @NoArgsConstructor
 public class CollectionPointStatusEntity {
     private UUID id;
-    private UUID vehicleId;
+    //private UUID vehicleId;
     private int averageDemand;
     private int effectiveDemand=0;
     private boolean isRouted;

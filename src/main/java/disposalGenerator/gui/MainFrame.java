@@ -13,8 +13,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
-
-import disposalGenerator.configuration.Configuration;
 import disposalGenerator.disposal.DisposalGenerator;
 import disposalGenerator.disposal.DisposalGeneratorCallback;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
@@ -35,7 +33,25 @@ public class MainFrame extends javax.swing.JFrame {
     private boolean mongoConnectionStatus = false;
     private boolean artemisConnectionStatus = false;
 
+    private boolean sleep = false;
+
     private ScheduledExecutorService scheduler;
+
+
+    static{
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.info("Chiusura app...");
+            try {
+                DisposalGenerator.getDisposalGenerator().disconnect();
+            } catch (Exception e) {
+                log.error(e.getMessage());
+            }
+            log.info("Terminato");
+            LogManager.shutdown();
+        }));
+
+
+    }
 
     /**
      * Creates new form MainFrame
@@ -53,6 +69,8 @@ public class MainFrame extends javax.swing.JFrame {
                 mongoConnectionStatus = connected;
 
                 if(connected){
+                    jLabelMongoConnectionStatus.setText("CONNESSO");
+
                     if(artemisConnectionStatus){
 
                         jButtonDisconnect.setEnabled(true);
@@ -69,6 +87,8 @@ public class MainFrame extends javax.swing.JFrame {
                         tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
                     }
+                }else{
+                    jLabelMongoConnectionStatus.setText("DISCONNESSO");
                 }
 
             }
@@ -78,6 +98,7 @@ public class MainFrame extends javax.swing.JFrame {
                 artemisConnectionStatus = connected;
 
                 if(connected){
+                    jLabelArtemisConnectionStatus.setText("CONNESSO");
                     if(mongoConnectionStatus){
 
                         jButtonDisconnect.setEnabled(true);
@@ -94,6 +115,8 @@ public class MainFrame extends javax.swing.JFrame {
                         tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
                     }
+                }else{
+                    jLabelArtemisConnectionStatus.setText("DISCONNESSO");
                 }
 
             }
@@ -114,15 +137,7 @@ public class MainFrame extends javax.swing.JFrame {
 
             @Override
             public void onRoutes(List<ItineraryEntity> itineraryEntities) {
-                AtomicInteger count = new AtomicInteger(Configuration.pollingTime);
 
-                if(scheduler!=null) scheduler.shutdown();
-                scheduler= Executors.newScheduledThreadPool(1);
-
-                scheduler.scheduleAtFixedRate(() -> {
-                    jLabel3.setText(count.get()==1? "Prossimo aggiornamento dati tra 1 secondo":"Prossimo aggiornamento dati tra "+ count +" secondi");
-                    count.getAndDecrement();
-                },0,1, TimeUnit.SECONDS);
 
                 DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
                 tblModel.setRowCount(0); //Metodo per svuotare la tabella
@@ -148,9 +163,42 @@ public class MainFrame extends javax.swing.JFrame {
 
 
                 for(CollectionPointStatusEntity collectionPointStatus: collectionPointStatusEntities){
-                    String data[] = {collectionPointStatus.getId().toString(), String.valueOf(collectionPointStatus.getAverageDemand()), String.valueOf(collectionPointStatus.getEffectiveDemand())};
-                    tblModel.insertRow(0, data);
+                    if(collectionPointStatus!=null){
+                        String data[] = {collectionPointStatus.getId().toString(), String.valueOf(collectionPointStatus.getAverageDemand()), String.valueOf(collectionPointStatus.getEffectiveDemand())};
+                        tblModel.insertRow(0, data);
+                    }
+
                 }
+
+            }
+
+            @Override
+            public void onRescheduledUpdateData(int timeSeconds) {
+
+
+                if(timeSeconds==-100) {
+                    jLabel3.setText("Recupero dati");
+                    sleep=true;
+                }else if(timeSeconds==-101){
+                    jLabel3.setText("Dati recuperati. Pronto per una nuova ricerca");
+                    sleep=false;
+                }else if(timeSeconds==-102){
+                    jLabel3.setText("Errore nel recupero dei dati");
+                    sleep=false;
+                }
+                else{
+                    AtomicInteger count = new AtomicInteger(timeSeconds);
+
+                    if(scheduler!=null) scheduler.shutdown();
+                    scheduler= Executors.newScheduledThreadPool(1);
+
+                    scheduler.scheduleAtFixedRate(() -> {
+                        if(!sleep)  jLabel3.setText(count.get()==1? "Prossimo aggiornamento dati tra 1 secondo":"Prossimo aggiornamento dati tra "+ count +" secondi");
+                        count.getAndDecrement();
+                    },0,1, TimeUnit.SECONDS);
+
+                }
+
 
             }
         });
@@ -417,8 +465,6 @@ public class MainFrame extends javax.swing.JFrame {
 
         jSeparator2.setOrientation(javax.swing.SwingConstants.VERTICAL);
 
-        jLabel3.setText("Prossimo aggiornamento dati tra 15 secondi");
-
         jButtonUPDATENOW.setText("AGGIORNA ORA");
         jButtonUPDATENOW.setEnabled(false);
         jButtonUPDATENOW.addActionListener(new java.awt.event.ActionListener() {
@@ -515,6 +561,10 @@ public class MainFrame extends javax.swing.JFrame {
             jButtonSEND.setEnabled(true);
             jButtonUPDATENOW.setEnabled(true);
 
+            if(scheduler!=null) scheduler.shutdown();
+            jLabel3.setText("");
+
+
 
             DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
             tblModel.setRowCount(0); //Metodo per svuotare la tabella
@@ -596,14 +646,23 @@ public class MainFrame extends javax.swing.JFrame {
     }//GEN-LAST:event_jTableCPMouseClicked
 
     private void jButtonUPDATENOWActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonUPDATENOWActionPerformed
-        disposalGenerator.updateNow(selectedRoute);
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                disposalGenerator.updateNow(selectedRoute);
+            }
+        }).start();
+
+
     }//GEN-LAST:event_jButtonUPDATENOWActionPerformed
 
     private void jButtonSENDActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSENDActionPerformed
         // TODO add your handling code here:
 
         String vehicleID = jTextFieldVehicleUUIDtoSend.getText();
-        String capacity = jTextFieldVehicleUUIDtoSend.getText();
+        String capacity = jTextFieldCapacityToSend.getText();
         String cpID = jTextFieldCollectionPointFromtoSend.getText();
         String typeOfDisposal = (String) jComboBoxTypeOfDisposal.getSelectedItem();
         disposalGenerator.sendDisposal(typeOfDisposal, Integer.valueOf(capacity), UUID.fromString(cpID), UUID.fromString(vehicleID));
@@ -618,7 +677,12 @@ public class MainFrame extends javax.swing.JFrame {
 
         selectedRoute = s;
 
-        //RECUPERARE DATI
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                disposalGenerator.updateNow(s);
+            }
+        }).start();
 
     }//GEN-LAST:event_jTableRouteMouseClicked
 

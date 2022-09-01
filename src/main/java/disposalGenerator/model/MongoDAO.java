@@ -41,13 +41,13 @@ public class MongoDAO {
         return database.getCollection(collectionName, classType);
     }
 
-    public ItineraryEntity getActiveItineraryByVehicleId(UUID vehicleId) {
-        MongoCollection<ItineraryEntity> collection =getCollection("Itineraries",ItineraryEntity.class);
-        return collection.find(and(
-                eq("state", ItineraryState.RUNNING),
-                eq("vehicleId",vehicleId))
-        ).first();
-    }
+//    public ItineraryEntity getActiveItineraryByVehicleId(UUID vehicleId) {
+//        MongoCollection<ItineraryEntity> collection =getCollection("Itineraries",ItineraryEntity.class);
+//        return collection.find(and(
+//                eq("state", ItineraryState.RUNNING),
+//                eq("vehicleId",vehicleId))
+//        ).first();
+//    }
 
     public List<ItineraryEntity> getItinerariesByVehicleId(UUID vehicleId) {
         MongoCollection<ItineraryEntity> collection =getCollection("Itineraries", ItineraryEntity.class);
@@ -57,20 +57,20 @@ public class MongoDAO {
         return itineraryEntityList;
     }
 
-    public int getEffectiveDemandByCollectionPointId(UUID collectionPointId){
-        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointStatus", CollectionPointStatusEntity.class);
-        List<CollectionPointStatusEntity> collectionPointStatus = new ArrayList<>();
-        return collection.find(eq("id", collectionPointId)).first().getEffectiveDemand();
-    }
-
-    public int getExpectedDemandByCollectionPointId(UUID collectionPointId){
-        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointStatus", CollectionPointStatusEntity.class);
-        List<CollectionPointStatusEntity> collectionPointStatus = new ArrayList<>();
-        return collection.find(eq("id", collectionPointId)).first().getAverageDemand();
-    }
+//    public int getEffectiveDemandByCollectionPointId(UUID collectionPointId){
+//        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointsStatus", CollectionPointStatusEntity.class);
+//        List<CollectionPointStatusEntity> collectionPointStatus = new ArrayList<>();
+//        return collection.find(eq("id", collectionPointId)).first().getEffectiveDemand();
+//    }
+//
+//    public int getExpectedDemandByCollectionPointId(UUID collectionPointId){
+//        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointsStatus", CollectionPointStatusEntity.class);
+//        List<CollectionPointStatusEntity> collectionPointStatus = new ArrayList<>();
+//        return collection.find(eq("id", collectionPointId)).first().getAverageDemand();
+//    }
 
     public CollectionPointStatusEntity getCollectionPointStatusByID(UUID collectionPointId){
-        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointStatus", CollectionPointStatusEntity.class);
+        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointsStatus", CollectionPointStatusEntity.class);
         return collection.find(eq("_id", collectionPointId)).first();
     }
 

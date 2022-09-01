@@ -17,11 +17,11 @@ import javax.jms.Queue;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
 
 
 public class DisposalGenerator implements Runnable {
@@ -32,19 +32,21 @@ public class DisposalGenerator implements Runnable {
     private QueueSender sender;
     private MongoDAO mongoDAO;
 
-    private Set<DisposalGeneratorCallback> callbackSet = new HashSet<>();//Lista di callback per inviare eventi (all'interfaccia grafica)
+    private static Set<DisposalGeneratorCallback> callbackSet = new HashSet<>();//Lista di callback per inviare eventi (all'interfaccia grafica)
     private static DisposalGenerator instance = null;                   //Istanza per oggetto singleton
     private ScheduledExecutorService scheduler;
 
     private boolean mongoConnectionStatus = false;
     private boolean artemisConnectionStatus = false;
 
+    private Semaphore semaphore;
+
 
     private UUID vehicleId;
 
-    public void start(String vehicleId){
+    public void start(String vehicleId) {
         System.out.println(vehicleId);
-        this.vehicleId= UUID.fromString(vehicleId);
+        this.vehicleId = UUID.fromString(vehicleId);
         run();
     }
 
@@ -88,32 +90,34 @@ public class DisposalGenerator implements Runnable {
 
     @Override
     public void run() {
-        String uri = "tcp://"+ Configuration.artemisHost+":"+Configuration.artemisPort;
+        String uri = "tcp://" + Configuration.artemisHost + ":" + Configuration.artemisPort;
 
         try {
             // this code could be substituted by a lookup operation in a naming service
-//            QueueConnectionFactory connFactory = new ActiveMQQueueConnectionFactory(uri);
-//            connFactory.createQueueConnection(Configuration.artemisUsername, Configuration.artemisPassword);
-//
-//
-//            QueueConnection connection = connFactory.createQueueConnection();
-//            session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-//
-//            /* the code below could be substituted by a lookup operation in a naming service */
-//            queue = session.createQueue(Configuration.artemisQueueName);
-//            sender = session.createSender(queue);
+            QueueConnectionFactory connFactory = new ActiveMQQueueConnectionFactory(uri);
+            connFactory.createQueueConnection(Configuration.artemisUsername, Configuration.artemisPassword);
+
+
+            QueueConnection connection = connFactory.createQueueConnection();
+            session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
+
+            /* the code below could be substituted by a lookup operation in a naming service */
+            queue = session.createQueue(Configuration.artemisQueueName);
+            sender = session.createSender(queue);
             callbackSet.forEach(callback -> callback.onArtemisConnectionStatusChange(true));
 
             //COLLEGARSI A MONGO
             mongoDAO = new MongoDAO();
-            scheduler=Executors.newScheduledThreadPool(1);
+
+            semaphore = new Semaphore(1);
+
             callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(true));
 
-
+            scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
-                System.out.println("Scheduler");
+                callbackSet.forEach(callback -> callback.onRescheduledUpdateData(Configuration.pollingTime));
                 updateNow(MainFrame.selectedRoute);
-            },0,Configuration.pollingTime, TimeUnit.SECONDS);
+            }, 0, Configuration.pollingTime, TimeUnit.SECONDS);
 
         } catch (Exception e) {
             log.error(e.getMessage());
@@ -122,28 +126,44 @@ public class DisposalGenerator implements Runnable {
 
     }
 
-    public synchronized void updateNow(String routeId){
+    public synchronized void updateNow(String routeId) {
 
-        List<ItineraryEntity> itineraries= mongoDAO.getItinerariesByVehicleId(this.vehicleId);
-        callbackSet.forEach(callback -> callback.onRoutes(itineraries));
+        try {
+            semaphore.acquire();
+            callbackSet.forEach(callback -> callback.onRescheduledUpdateData(-100));
+            log.info("Recupero dati dal database");
+            List<ItineraryEntity> itineraries = mongoDAO.getItinerariesByVehicleId(vehicleId);
+            log.info("Trovate "+itineraries.size()+ " rotte per il veicolo "+vehicleId);
+            callbackSet.forEach(callback -> callback.onRoutes(itineraries));
 
-        //AGGIORNARE STATO DI TUTTE LE ROTTE
+            //AGGIORNARE STATO DI TUTTE LE ROTTE
 
-        if(routeId != ""){
-            System.out.println(routeId);
-            ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
-            List<CollectionPointStatusEntity> collectionPointStatusEntities = new ArrayList<>();
-            for(Coordinates c: itinerary.getCoordinates()){
-                if(c.getCollectionPointId()!=null){
-                    collectionPointStatusEntities.add(mongoDAO.getCollectionPointStatusByID(c.getCollectionPointId()));
+            if (routeId != "") {
+                log.info("Rotta selezionata: " +routeId);
+                ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
+                List<CollectionPointStatusEntity> collectionPointStatusEntities = new ArrayList<>();
+                for (Coordinates c : itinerary.getCoordinates()) {
+                    if (c.getCollectionPointId() != null) {
+                        collectionPointStatusEntities.add(mongoDAO.getCollectionPointStatusByID(c.getCollectionPointId()));
+                    }
                 }
+                log.info("Collection point trovati: "+collectionPointStatusEntities.size());
+                callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
             }
-            System.out.println(collectionPointStatusEntities.size());
-            callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
+            log.info("Pronto per una nuova ricerca");
+            callbackSet.forEach(callback -> callback.onRescheduledUpdateData(-101));
+            semaphore.release();
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            callbackSet.forEach(callback -> callback.onRescheduledUpdateData(-102));
+            callbackSet.forEach(callback -> callback.onError(e.getMessage()));
+            throw new RuntimeException(e);
         }
+
+
     }
 
-    public void sendDisposal(String typeOfDisposal, int capacity, UUID collectionPointAt, UUID vehicleIdFrom){
+    public void sendDisposal(String typeOfDisposal, int capacity, UUID collectionPointAt, UUID vehicleIdFrom) {
 
         try {
             DisposalDriver disposalDriver = new DisposalDriver(
@@ -168,12 +188,14 @@ public class DisposalGenerator implements Runnable {
 
     public void disconnect() throws Exception {
 
+        if (sender != null) {
             sender.close();
-            callbackSet.forEach(callback -> callback.onArtemisConnectionStatusChange(false));
-            scheduler.shutdown();
-            //DISCOLLEGARSI DA MONGO
-            mongoDAO.closeSession();
-            callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(false));
+        }
+        callbackSet.forEach(callback -> callback.onArtemisConnectionStatusChange(false));
+        if (scheduler != null) scheduler.shutdown();
+        //DISCOLLEGARSI DA MONGO
+        if (mongoDAO != null) mongoDAO.closeSession();
+        callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(false));
 
 
     }
