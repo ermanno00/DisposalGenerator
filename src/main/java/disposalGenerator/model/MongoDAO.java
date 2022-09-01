@@ -12,6 +12,7 @@ import org.bson.Document;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
+import org.bson.types.ObjectId;
 
 
 import java.util.ArrayList;
@@ -19,8 +20,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.mongodb.MongoClientSettings.getDefaultCodecRegistry;
-import static com.mongodb.client.model.Filters.and;
-import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.*;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -69,9 +69,10 @@ public class MongoDAO {
 //        return collection.find(eq("id", collectionPointId)).first().getAverageDemand();
 //    }
 
-    public CollectionPointStatusEntity getCollectionPointStatusByID(UUID collectionPointId){
+    public List<CollectionPointStatusEntity> getCollectionPointStatusByIDIn(List<UUID> collectionPointId){
         MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointsStatus", CollectionPointStatusEntity.class);
-        return collection.find(eq("_id", collectionPointId)).first();
+        List<CollectionPointStatusEntity>result = new ArrayList<>();
+        return collection.find(in("_id", collectionPointId)).into(result);
     }
 
     public void closeSession(){

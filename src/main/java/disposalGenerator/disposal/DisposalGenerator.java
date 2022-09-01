@@ -141,12 +141,13 @@ public class DisposalGenerator implements Runnable {
             if (routeId != "") {
                 log.info("Rotta selezionata: " +routeId);
                 ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
-                List<CollectionPointStatusEntity> collectionPointStatusEntities = new ArrayList<>();
+                List<UUID>ids = new ArrayList<>();
                 for (Coordinates c : itinerary.getCoordinates()) {
                     if (c.getCollectionPointId() != null) {
-                        collectionPointStatusEntities.add(mongoDAO.getCollectionPointStatusByID(c.getCollectionPointId()));
+                        ids.add(c.getCollectionPointId());
                     }
                 }
+                List<CollectionPointStatusEntity> collectionPointStatusEntities = mongoDAO.getCollectionPointStatusByIDIn(ids);
                 log.info("Collection point trovati: "+collectionPointStatusEntities.size());
                 callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
             }
