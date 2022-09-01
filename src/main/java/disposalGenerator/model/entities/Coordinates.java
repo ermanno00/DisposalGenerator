@@ -1,13 +1,10 @@
 package disposalGenerator.model.entities;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.ToString;
+import lombok.*;
 
 import java.util.UUID;
 
-@Getter
+@Data
 @ToString
 @NoArgsConstructor
 @AllArgsConstructor

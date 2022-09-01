@@ -4,22 +4,157 @@
  */
 package disposalGenerator.gui;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 
+import disposalGenerator.configuration.Configuration;
+import disposalGenerator.disposal.DisposalGenerator;
+import disposalGenerator.disposal.DisposalGeneratorCallback;
+import disposalGenerator.model.entities.CollectionPointStatusEntity;
+import disposalGenerator.model.entities.ItineraryEntity;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+
 /**
- *
  * @author erman
  */
 public class MainFrame extends javax.swing.JFrame {
+    static Logger log = LogManager.getLogger(MainFrame.class);
+    private DisposalGenerator disposalGenerator;
+
+    public static String selectedRoute = "";
+
+    private boolean mongoConnectionStatus = false;
+    private boolean artemisConnectionStatus = false;
+
+    private ScheduledExecutorService scheduler;
 
     /**
      * Creates new form MainFrame
      */
     public MainFrame() {
         initComponents();
+        disposalGenerator = DisposalGenerator.getDisposalGenerator();
+        disposalListener();
+    }
+
+    private void disposalListener() {
+        disposalGenerator.addListener(new DisposalGeneratorCallback() {
+            @Override
+            public void onMongoConnectionStatusChange(boolean connected) {
+                mongoConnectionStatus = connected;
+
+                if(connected){
+                    if(artemisConnectionStatus){
+
+                        jButtonDisconnect.setEnabled(true);
+                        jTextFieldVehicleUUID.setEditable(false);
+                        jButtonConnect.setEnabled(false);
+
+                        jButtonSEND.setEnabled(true);
+                        jButtonUPDATENOW.setEnabled(true);
+
+                        DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
+                        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+                        tblModel = (DefaultTableModel) jTableCP.getModel();
+                        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+                    }
+                }
+
+            }
+
+            @Override
+            public void onArtemisConnectionStatusChange(boolean connected) {
+                artemisConnectionStatus = connected;
+
+                if(connected){
+                    if(mongoConnectionStatus){
+
+                        jButtonDisconnect.setEnabled(true);
+                        jTextFieldVehicleUUID.setEditable(false);
+                        jButtonConnect.setEnabled(false);
+
+                        jButtonSEND.setEnabled(true);
+                        jButtonUPDATENOW.setEnabled(true);
+
+                        DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
+                        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+                        tblModel = (DefaultTableModel) jTableCP.getModel();
+                        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+                    }
+                }
+
+            }
+
+            @Override
+            public void onError(String error) {
+                log.error(error);
+                JOptionPane.showMessageDialog(null, error, "Errore", JOptionPane.ERROR_MESSAGE);
+
+            }
+
+            @Override
+            public void onMessage(String message) {
+                log.info(message);
+                JOptionPane.showMessageDialog(null, message, "Info", JOptionPane.INFORMATION_MESSAGE);
+
+            }
+
+            @Override
+            public void onRoutes(List<ItineraryEntity> itineraryEntities) {
+                AtomicInteger count = new AtomicInteger(Configuration.pollingTime);
+
+                if(scheduler!=null) scheduler.shutdown();
+                scheduler= Executors.newScheduledThreadPool(1);
+
+                scheduler.scheduleAtFixedRate(() -> {
+                    jLabel3.setText(count.get()==1? "Prossimo aggiornamento dati tra 1 secondo":"Prossimo aggiornamento dati tra "+ count +" secondi");
+                    count.getAndDecrement();
+                },0,1, TimeUnit.SECONDS);
+
+                DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
+                tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+                for(ItineraryEntity itineraryEntity: itineraryEntities){
+                    String data[] = {itineraryEntity.getId().toString(), itineraryEntity.getState().toString()};
+                    tblModel.insertRow(0, data);
+                }
+
+
+
+
+
+
+
+            }
+
+            @Override
+            public void onCollectionPoint(List<CollectionPointStatusEntity> collectionPointStatusEntities) {
+
+                DefaultTableModel tblModel = (DefaultTableModel) jTableCP.getModel();
+                tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+
+                for(CollectionPointStatusEntity collectionPointStatus: collectionPointStatusEntities){
+                    String data[] = {collectionPointStatus.getId().toString(), String.valueOf(collectionPointStatus.getAverageDemand()), String.valueOf(collectionPointStatus.getEffectiveDemand())};
+                    tblModel.insertRow(0, data);
+                }
+
+            }
+        });
+
     }
 
     /**
@@ -122,6 +257,11 @@ public class MainFrame extends javax.swing.JFrame {
                 "ID Rotta", "Stato"
             }
         ));
+        jTableRoute.addMouseListener(new java.awt.event.MouseAdapter() {
+            public void mouseClicked(java.awt.event.MouseEvent evt) {
+                jTableRouteMouseClicked(evt);
+            }
+        });
         jScrollPane1.setViewportView(jTableRoute);
 
         javax.swing.GroupLayout routePanelLayout = new javax.swing.GroupLayout(routePanel);
@@ -365,99 +505,122 @@ public class MainFrame extends javax.swing.JFrame {
 
     private void jButtonDisconnectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonDisconnectActionPerformed
 
-        jButtonDisconnect.setEnabled(false);
-        jTextFieldVehicleUUID.setEditable(true);
-        jButtonConnect.setEnabled(true);
-        
-        jButtonSEND.setEnabled(true);
-        jButtonUPDATENOW.setEnabled(true);
-        
-        
-        DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
-        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+        try{
+            disposalGenerator.disconnect();
 
-        tblModel = (DefaultTableModel) jTableCP.getModel();
-        tblModel.setRowCount(0); //Metodo per svuotare la tabella
+            jButtonDisconnect.setEnabled(false);
+            jTextFieldVehicleUUID.setEditable(true);
+            jButtonConnect.setEnabled(true);
+
+            jButtonSEND.setEnabled(true);
+            jButtonUPDATENOW.setEnabled(true);
+
+
+            DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
+            tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+            tblModel = (DefaultTableModel) jTableCP.getModel();
+            tblModel.setRowCount(0); //Metodo per svuotare la tabella
+
+        }catch(Exception e){
+            log.error(e.getMessage());
+            JOptionPane.showMessageDialog(null, e.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
+
+        }
+
     }//GEN-LAST:event_jButtonDisconnectActionPerformed
 
     private void jButtonConnectActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonConnectActionPerformed
 
-        try{
+        try {
             UUID.fromString(jTextFieldVehicleUUID.getText());
-            
-            jButtonDisconnect.setEnabled(true);
-        jTextFieldVehicleUUID.setEditable(false);
-        jButtonConnect.setEnabled(false);
-        
-        jButtonSEND.setEnabled(true);
-        jButtonUPDATENOW.setEnabled(true);
-        
-        DefaultTableModel tblModel = (DefaultTableModel) jTableRoute.getModel();
-        tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
-        tblModel = (DefaultTableModel) jTableCP.getModel();
-        tblModel.setRowCount(0); //Metodo per svuotare la tabella
-        
-        jTextFieldVehicleUUIDtoSend.setText(jTextFieldVehicleUUID.getText());
-        }catch(Exception e){
+            disposalGenerator.start(jTextFieldVehicleUUID.getText());
+
+
+            jTextFieldVehicleUUIDtoSend.setText(jTextFieldVehicleUUID.getText());
+        } catch (Exception e) {
+            log.error(e.getMessage());
             JOptionPane.showMessageDialog(null, e.getMessage(), "Errore", JOptionPane.ERROR_MESSAGE);
-            
-            
+
+
         }
-        
-        
-        
+
+
     }//GEN-LAST:event_jButtonConnectActionPerformed
 
     private void jTextFieldVehicleUUIDMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTextFieldVehicleUUIDMouseClicked
-        if(jTextFieldVehicleUUID.getText().equals("Inserisci UUID del veicolo")) jTextFieldVehicleUUID.setText("");
+        if (jTextFieldVehicleUUID.getText().equals("Inserisci UUID del veicolo")) jTextFieldVehicleUUID.setText("");
     }//GEN-LAST:event_jTextFieldVehicleUUIDMouseClicked
 
     private void jTextFieldVehicleUUIDFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_jTextFieldVehicleUUIDFocusLost
-        if(jTextFieldVehicleUUID.getText().equals("")) jTextFieldVehicleUUID.setText("Inserisci UUID del veicolo");
+        if (jTextFieldVehicleUUID.getText().equals("")) jTextFieldVehicleUUID.setText("Inserisci UUID del veicolo");
     }//GEN-LAST:event_jTextFieldVehicleUUIDFocusLost
 
     private void jTextFieldVehicleUUIDtoSendFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_jTextFieldVehicleUUIDtoSendFocusLost
-         if(jTextFieldVehicleUUIDtoSend.getText().equals("")) jTextFieldVehicleUUIDtoSend.setText("Inserisci UUID Veicolo");
+        if (jTextFieldVehicleUUIDtoSend.getText().equals(""))
+            jTextFieldVehicleUUIDtoSend.setText("Inserisci UUID Veicolo");
     }//GEN-LAST:event_jTextFieldVehicleUUIDtoSendFocusLost
 
     private void jTextFieldVehicleUUIDtoSendMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTextFieldVehicleUUIDtoSendMouseClicked
-        if(jTextFieldVehicleUUIDtoSend.getText().equals("Inserisci UUID Veicolo")) jTextFieldVehicleUUIDtoSend.setText("");
+        if (jTextFieldVehicleUUIDtoSend.getText().equals("Inserisci UUID Veicolo"))
+            jTextFieldVehicleUUIDtoSend.setText("");
     }//GEN-LAST:event_jTextFieldVehicleUUIDtoSendMouseClicked
 
     private void jTextFieldCapacityToSendFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_jTextFieldCapacityToSendFocusLost
-        if(jTextFieldCapacityToSend.getText().equals("")) jTextFieldCapacityToSend.setText("Inserisci capacit� raccolta (in litri)");
+        if (jTextFieldCapacityToSend.getText().equals(""))
+            jTextFieldCapacityToSend.setText("Inserisci capacit� raccolta (in litri)");
     }//GEN-LAST:event_jTextFieldCapacityToSendFocusLost
 
     private void jTextFieldCapacityToSendMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTextFieldCapacityToSendMouseClicked
-        if(jTextFieldCapacityToSend.getText().equals("Inserisci capacit� raccolta (in litri)")) jTextFieldCapacityToSend.setText("");
+        if (jTextFieldCapacityToSend.getText().equals("Inserisci capacit� raccolta (in litri)"))
+            jTextFieldCapacityToSend.setText("");
     }//GEN-LAST:event_jTextFieldCapacityToSendMouseClicked
 
     private void jTextFieldCollectionPointFromtoSendFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_jTextFieldCollectionPointFromtoSendFocusLost
-        if(jTextFieldCollectionPointFromtoSend.getText().equals("")) jTextFieldCollectionPointFromtoSend.setText("Inserisci UUID collection point");
+        if (jTextFieldCollectionPointFromtoSend.getText().equals(""))
+            jTextFieldCollectionPointFromtoSend.setText("Inserisci UUID collection point");
     }//GEN-LAST:event_jTextFieldCollectionPointFromtoSendFocusLost
 
     private void jTextFieldCollectionPointFromtoSendMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTextFieldCollectionPointFromtoSendMouseClicked
-        if(jTextFieldCollectionPointFromtoSend.getText().equals("Inserisci UUID collection point")) jTextFieldCollectionPointFromtoSend.setText("");
+        if (jTextFieldCollectionPointFromtoSend.getText().equals("Inserisci UUID collection point"))
+            jTextFieldCollectionPointFromtoSend.setText("");
     }//GEN-LAST:event_jTextFieldCollectionPointFromtoSendMouseClicked
 
     private void jTableCPMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTableCPMouseClicked
-        JTable t= (JTable)evt.getSource();
+        JTable t = (JTable) evt.getSource();
         int row = t.getSelectedRow();
-             //int column = t.getSelectedColumn();
-            String s = (String)t.getValueAt(row, 0);
-            jTextFieldCollectionPointFromtoSend.setText(s);
+        //int column = t.getSelectedColumn();
+        String s = (String) t.getValueAt(row, 0);
+        jTextFieldCollectionPointFromtoSend.setText(s);
     }//GEN-LAST:event_jTableCPMouseClicked
 
     private void jButtonUPDATENOWActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonUPDATENOWActionPerformed
-        // TODO add your handling code here:
+        disposalGenerator.updateNow(selectedRoute);
     }//GEN-LAST:event_jButtonUPDATENOWActionPerformed
 
     private void jButtonSENDActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonSENDActionPerformed
         // TODO add your handling code here:
+
+        String vehicleID = jTextFieldVehicleUUIDtoSend.getText();
+        String capacity = jTextFieldVehicleUUIDtoSend.getText();
+        String cpID = jTextFieldCollectionPointFromtoSend.getText();
+        String typeOfDisposal = (String) jComboBoxTypeOfDisposal.getSelectedItem();
+        disposalGenerator.sendDisposal(typeOfDisposal, Integer.valueOf(capacity), UUID.fromString(cpID), UUID.fromString(vehicleID));
     }//GEN-LAST:event_jButtonSENDActionPerformed
 
+    private void jTableRouteMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTableRouteMouseClicked
+        
+        JTable t = (JTable) evt.getSource();
+        int row = t.getSelectedRow();
+        //int column = t.getSelectedColumn();
+        String s = (String) t.getValueAt(row, 0);
 
+        selectedRoute = s;
+
+        //RECUPERARE DATI
+
+    }//GEN-LAST:event_jTableRouteMouseClicked
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables

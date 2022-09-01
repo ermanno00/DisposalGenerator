@@ -3,16 +3,18 @@ package disposalGenerator.disposal;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import disposalGenerator.configuration.Configuration;
+import disposalGenerator.gui.MainFrame;
 import disposalGenerator.model.MongoDAO;
+import disposalGenerator.model.entities.CollectionPointStatusEntity;
+import disposalGenerator.model.entities.Coordinates;
+import disposalGenerator.model.entities.ItineraryEntity;
 import disposalGenerator.model.entities.TypeOfDisposal;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.activemq.artemis.jms.client.ActiveMQQueueConnectionFactory;
 
 import javax.jms.*;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.UUID;
+import javax.jms.Queue;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -34,10 +36,14 @@ public class DisposalGenerator implements Runnable {
     private static DisposalGenerator instance = null;                   //Istanza per oggetto singleton
     private ScheduledExecutorService scheduler;
 
+    private boolean mongoConnectionStatus = false;
+    private boolean artemisConnectionStatus = false;
+
 
     private UUID vehicleId;
 
     public void start(String vehicleId){
+        System.out.println(vehicleId);
         this.vehicleId= UUID.fromString(vehicleId);
         run();
     }
@@ -48,7 +54,7 @@ public class DisposalGenerator implements Runnable {
      *
      * @return TunnelManager
      */
-    public static synchronized DisposalGenerator getTunnelManager() {
+    public static synchronized DisposalGenerator getDisposalGenerator() {
         if (instance == null) {
             instance = new DisposalGenerator();
         }
@@ -86,39 +92,64 @@ public class DisposalGenerator implements Runnable {
 
         try {
             // this code could be substituted by a lookup operation in a naming service
-            QueueConnectionFactory connFactory = new ActiveMQQueueConnectionFactory(uri);
-            connFactory.createQueueConnection(Configuration.artemisUsername, Configuration.artemisPassword);
-
-            QueueConnection connection = connFactory.createQueueConnection();
-            session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-
-            /* the code below could be substituted by a lookup operation in a naming service */
-            queue = session.createQueue(Configuration.artemisQueueName);
-            sender = session.createSender(queue);
+//            QueueConnectionFactory connFactory = new ActiveMQQueueConnectionFactory(uri);
+//            connFactory.createQueueConnection(Configuration.artemisUsername, Configuration.artemisPassword);
+//
+//
+//            QueueConnection connection = connFactory.createQueueConnection();
+//            session = connection.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
+//
+//            /* the code below could be substituted by a lookup operation in a naming service */
+//            queue = session.createQueue(Configuration.artemisQueueName);
+//            sender = session.createSender(queue);
             callbackSet.forEach(callback -> callback.onArtemisConnectionStatusChange(true));
 
             //COLLEGARSI A MONGO
             mongoDAO = new MongoDAO();
             scheduler=Executors.newScheduledThreadPool(1);
             callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(true));
+
+
             scheduler.scheduleAtFixedRate(() -> {
-                //ottieni dati dal db e mandali in callback
-                var itineraries= mongoDAO.getItinerariesByVehicleId(this.vehicleId);
+                System.out.println("Scheduler");
+                updateNow(MainFrame.selectedRoute);
             },0,Configuration.pollingTime, TimeUnit.SECONDS);
 
-        } catch (JMSException e) {
+        } catch (Exception e) {
             log.error(e.getMessage());
+            callbackSet.forEach(callback -> callback.onError(e.getMessage()));
         }
 
     }
 
-    public void sendDisposal(TypeOfDisposal typeOfDisposal, int capacity, UUID collectionPointAt, UUID vehicleIdFrom){
+    public synchronized void updateNow(String routeId){
+
+        List<ItineraryEntity> itineraries= mongoDAO.getItinerariesByVehicleId(this.vehicleId);
+        callbackSet.forEach(callback -> callback.onRoutes(itineraries));
+
+        //AGGIORNARE STATO DI TUTTE LE ROTTE
+
+        if(routeId != ""){
+            System.out.println(routeId);
+            ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
+            List<CollectionPointStatusEntity> collectionPointStatusEntities = new ArrayList<>();
+            for(Coordinates c: itinerary.getCoordinates()){
+                if(c.getCollectionPointId()!=null){
+                    collectionPointStatusEntities.add(mongoDAO.getCollectionPointStatusByID(c.getCollectionPointId()));
+                }
+            }
+            System.out.println(collectionPointStatusEntities.size());
+            callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
+        }
+    }
+
+    public void sendDisposal(String typeOfDisposal, int capacity, UUID collectionPointAt, UUID vehicleIdFrom){
 
         try {
             DisposalDriver disposalDriver = new DisposalDriver(
                     UUID.randomUUID().toString(),
                     new Date(),
-                    typeOfDisposal.name(),
+                    typeOfDisposal,
                     capacity,
                     collectionPointAt,  //Collection Point
                     vehicleIdFrom //Vehicle
@@ -135,8 +166,8 @@ public class DisposalGenerator implements Runnable {
 
     }
 
-    public void disconnect(){
-        try {
+    public void disconnect() throws Exception {
+
             sender.close();
             callbackSet.forEach(callback -> callback.onArtemisConnectionStatusChange(false));
             scheduler.shutdown();
@@ -145,12 +176,6 @@ public class DisposalGenerator implements Runnable {
             callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(false));
 
 
-
-        }catch (Exception e){
-            log.error("disconnetion problem: "+e.getMessage());
-            callbackSet.forEach(callback -> callback.onError(e.getMessage()));
-
-        }
     }
 
 

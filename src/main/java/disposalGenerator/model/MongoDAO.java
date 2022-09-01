@@ -8,6 +8,7 @@ import disposalGenerator.configuration.Configuration;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
 import disposalGenerator.model.entities.ItineraryEntity;
 import disposalGenerator.model.entities.ItineraryState;
+import org.bson.Document;
 import org.bson.codecs.configuration.CodecProvider;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
@@ -49,9 +50,10 @@ public class MongoDAO {
     }
 
     public List<ItineraryEntity> getItinerariesByVehicleId(UUID vehicleId) {
-        MongoCollection<ItineraryEntity> collection =getCollection("Itineraries",ItineraryEntity.class);
+        MongoCollection<ItineraryEntity> collection =getCollection("Itineraries", ItineraryEntity.class);
         List<ItineraryEntity> itineraryEntityList = new ArrayList<>();
         collection.find(eq("vehicleId",vehicleId)).into(itineraryEntityList);
+
         return itineraryEntityList;
     }
 
@@ -65,6 +67,11 @@ public class MongoDAO {
         MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointStatus", CollectionPointStatusEntity.class);
         List<CollectionPointStatusEntity> collectionPointStatus = new ArrayList<>();
         return collection.find(eq("id", collectionPointId)).first().getAverageDemand();
+    }
+
+    public CollectionPointStatusEntity getCollectionPointStatusByID(UUID collectionPointId){
+        MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointStatus", CollectionPointStatusEntity.class);
+        return collection.find(eq("_id", collectionPointId)).first();
     }
 
     public void closeSession(){

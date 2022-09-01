@@ -16,8 +16,5 @@ public class CollectionPointStatusEntity {
     private int effectiveDemand=0;
     private boolean isRouted;
 
-    public void addDisposal(){
-        this.effectiveDemand++;
-    }
 
 }
