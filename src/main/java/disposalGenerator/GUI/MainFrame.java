@@ -145,13 +145,7 @@ public class MainFrame extends javax.swing.JFrame {
                 tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
                 for (ItineraryEntity itineraryEntity : itineraryEntities) {
-                    int count = 0;
-                    for (Coordinates c : itineraryEntity.getCoordinates()) {
-                        if (c.getCollectionPointId() != null) {
-                            count++;
-                        }
-                    }
-                    String data[] = {itineraryEntity.getId().toString(), itineraryEntity.getState().toString(), String.valueOf(count)};
+                    String data[] = {itineraryEntity.getId().toString(), itineraryEntity.getState().toString(), String.valueOf(itineraryEntity.getServedNodes().size()-2), String.valueOf(itineraryEntity.getTimestamp()), String.valueOf(itineraryEntity.getCost())};
                     tblModel.insertRow(0, data);
                 }
 
@@ -306,7 +300,7 @@ public class MainFrame extends javax.swing.JFrame {
 
             },
             new String [] {
-                "ID Rotta", "Stato", "Numero Collection Point"
+                "ID Rotta", "Stato", "Numero Collection Point", "TimeStamp", "Costo"
             }
         ));
         jTableRoute.addMouseListener(new java.awt.event.MouseAdapter() {

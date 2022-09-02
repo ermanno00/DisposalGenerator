@@ -1,6 +1,5 @@
 package disposalGenerator.disposal;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import disposalGenerator.configuration.Configuration;
 import disposalGenerator.GUI.MainFrame;
@@ -139,13 +138,8 @@ public class DisposalGenerator implements Runnable {
             if (routeId != "") {
                 log.info("Rotta selezionata: " +routeId);
                 ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
-                List<UUID>ids = new ArrayList<>();
-                for (Coordinates c : itinerary.getCoordinates()) {
-                    if (c.getCollectionPointId() != null) {
-                        ids.add(c.getCollectionPointId());
-                    }
-                }
-                List<CollectionPointStatusEntity> collectionPointStatusEntities = mongoDAO.getCollectionPointStatusByIDIn(ids);
+
+                List<CollectionPointStatusEntity> collectionPointStatusEntities = mongoDAO.getCollectionPointStatusByIDIn(itinerary.getServedNodes());
                 log.info("Collection point trovati: "+collectionPointStatusEntities.size());
                 callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
             }
@@ -178,7 +172,7 @@ public class DisposalGenerator implements Runnable {
             TextMessage disposalMessage = session.createTextMessage(serialized);
             sender.send(disposalMessage);
             callbackSet.forEach(callback -> callback.onMessage("Disposal raccolto"));
-        } catch (JsonProcessingException | JMSException e) {
+        } catch ( Exception e) {
             log.error(e.getMessage());
             callbackSet.forEach(callback -> callback.onError(e.getMessage()));
         }
