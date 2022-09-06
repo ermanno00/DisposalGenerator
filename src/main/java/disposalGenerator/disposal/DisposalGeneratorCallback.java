@@ -16,5 +16,7 @@ public interface DisposalGeneratorCallback {
 
     void onRescheduledUpdateData(int timeSeconds);
 
+    void onEnvironmentData(String rubbishDumpId, String depotId, long staticTimestamp, String typeOfDisposal);
+
 
 }

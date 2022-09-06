@@ -4,6 +4,7 @@
  */
 package disposalGenerator.GUI;
 
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -14,6 +15,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 
+import disposalGenerator.configuration.Constants;
 import disposalGenerator.disposal.DisposalGenerator;
 import disposalGenerator.disposal.DisposalGeneratorCallback;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
@@ -38,6 +40,10 @@ public class MainFrame extends javax.swing.JFrame {
     private boolean sleep = false;
 
     private ScheduledExecutorService scheduler;
+    
+    private  String rubbishDumpID = "";
+    private String depotID = "";
+    
 
 
     static {
@@ -145,7 +151,7 @@ public class MainFrame extends javax.swing.JFrame {
                 tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
                 for (ItineraryEntity itineraryEntity : itineraryEntities) {
-                    String data[] = {itineraryEntity.getId().toString(), itineraryEntity.getState().toString(), String.valueOf(itineraryEntity.getServedNodes().size()-2), String.valueOf(itineraryEntity.getTimestamp()), String.valueOf(itineraryEntity.getCost())};
+                    String data[] = {itineraryEntity.getId().toString(), itineraryEntity.getState().toString(), String.valueOf(itineraryEntity.getServedNodes().size()), String.valueOf(itineraryEntity.getTimestamp()), String.valueOf(itineraryEntity.getCost())};
                     tblModel.insertRow(0, data);
                 }
 
@@ -154,19 +160,27 @@ public class MainFrame extends javax.swing.JFrame {
 
             @Override
             public void onCollectionPoint(List<CollectionPointStatusEntity> collectionPointStatusEntities) {
+                
+                
+                jLabelSelectedRoute.setText(selectedRoute);
 
                 DefaultTableModel tblModel = (DefaultTableModel) jTableCP.getModel();
                 tblModel.setRowCount(0); //Metodo per svuotare la tabella
 
 
-                for (CollectionPointStatusEntity collectionPointStatus : collectionPointStatusEntities) {
-
-
-                    String data[] = {collectionPointStatus.getId().toString(), String.valueOf(collectionPointStatus.getAverageDemand()), String.valueOf(collectionPointStatus.getEffectiveDemand()), collectionPointStatus.isRouted()?"ROUTED":"NOT ROUTED"};
+                
+                for(int i=collectionPointStatusEntities.size()-1; i>=0; i--){
+                    
+                    String note = "";
+                    
+                    if(collectionPointStatusEntities.get(i).getId().toString().equals(rubbishDumpID)) note = "RUBBISH DUMP";
+                    else if(collectionPointStatusEntities.get(i).getId().toString().equals(depotID)) note = "DEPOT";
+                    
+                    String data[] = {String.valueOf(i), collectionPointStatusEntities.get(i).getId().toString(), String.valueOf(collectionPointStatusEntities.get(i).getAverageDemand()), String.valueOf(collectionPointStatusEntities.get(i).getEffectiveDemand()), collectionPointStatusEntities.get(i).getEffectiveDemand()>collectionPointStatusEntities.get(i).getAverageDemand() ? String.valueOf(collectionPointStatusEntities.get(i).getEffectiveDemand()-collectionPointStatusEntities.get(i).getAverageDemand()): String.valueOf(0),  collectionPointStatusEntities.get(i).getIsRouted()?"ROUTED":"NOT ROUTED", note};
                     tblModel.insertRow(0, data);
 
-
                 }
+               
 
             }
 
@@ -199,6 +213,20 @@ public class MainFrame extends javax.swing.JFrame {
 
 
             }
+
+            @Override
+            public void onEnvironmentData(String rubbishDumpId, String depotId, long staticTimestamp, String typeOfDisposal) {
+
+                depotID = depotId;
+                rubbishDumpID = rubbishDumpId;
+
+                jLabelRubbishDumpID.setText(rubbishDumpId);
+                jLabelDepotID.setText(depotId);
+                jLabelStaticTimestamp.setText(String.valueOf(staticTimestamp)+" - "+ Constants.sdf.format(new Date(staticTimestamp)));
+                jLabelTypeOfDisposal.setText(typeOfDisposal);
+
+
+            }
         });
 
     }
@@ -222,6 +250,9 @@ public class MainFrame extends javax.swing.JFrame {
         cpPanel = new javax.swing.JPanel();
         jScrollPane2 = new javax.swing.JScrollPane();
         jTableCP = new javax.swing.JTable();
+        jPanel5 = new javax.swing.JPanel();
+        jLabel4 = new javax.swing.JLabel();
+        jLabelSelectedRoute = new javax.swing.JLabel();
         disposalPanel = new javax.swing.JPanel();
         jPanel3 = new javax.swing.JPanel();
         jTextFieldVehicleUUIDtoSend = new javax.swing.JTextField();
@@ -229,7 +260,17 @@ public class MainFrame extends javax.swing.JFrame {
         jTextFieldCollectionPointFromtoSend = new javax.swing.JTextField();
         jComboBoxTypeOfDisposal = new javax.swing.JComboBox<>();
         jPanel4 = new javax.swing.JPanel();
+        jPanel6 = new javax.swing.JPanel();
         jButtonSEND = new javax.swing.JButton();
+        jPanel7 = new javax.swing.JPanel();
+        jLabel5 = new javax.swing.JLabel();
+        jLabel6 = new javax.swing.JLabel();
+        jLabel7 = new javax.swing.JLabel();
+        jLabel8 = new javax.swing.JLabel();
+        jLabelStaticTimestamp = new javax.swing.JLabel();
+        jLabelDepotID = new javax.swing.JLabel();
+        jLabelRubbishDumpID = new javax.swing.JLabel();
+        jLabelTypeOfDisposal = new javax.swing.JLabel();
         statusPanel = new javax.swing.JPanel();
         jLabel1 = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
@@ -295,12 +336,13 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap())
         );
 
+        jTableRoute.setAutoCreateRowSorter(true);
         jTableRoute.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
             },
             new String [] {
-                "ID Rotta", "Stato", "Numero Collection Point", "TimeStamp", "Costo"
+                "ID Rotta", "Stato", "Numero STOP", "TimeStamp", "Costo"
             }
         ));
         jTableRoute.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -318,7 +360,7 @@ public class MainFrame extends javax.swing.JFrame {
         );
         routePanelLayout.setVerticalGroup(
             routePanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 168, Short.MAX_VALUE)
+            .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 158, Short.MAX_VALUE)
         );
 
         jTableCP.setModel(new javax.swing.table.DefaultTableModel(
@@ -326,7 +368,7 @@ public class MainFrame extends javax.swing.JFrame {
 
             },
             new String [] {
-                "Collection Point", "Litri aspettati", "Litri effettivi", "Stato"
+                "Ordine", "Collection Point", "Litri aspettati", "Litri effettivi", "Extrasoglia", "Stato", "Note"
             }
         ));
         jTableCP.addMouseListener(new java.awt.event.MouseAdapter() {
@@ -336,15 +378,45 @@ public class MainFrame extends javax.swing.JFrame {
         });
         jScrollPane2.setViewportView(jTableCP);
 
+        jLabel4.setText("Rotta selezionata:");
+
+        jLabelSelectedRoute.setFont(new java.awt.Font("Segoe UI", 0, 18)); // NOI18N
+        jLabelSelectedRoute.setForeground(new java.awt.Color(255, 0, 0));
+
+        javax.swing.GroupLayout jPanel5Layout = new javax.swing.GroupLayout(jPanel5);
+        jPanel5.setLayout(jPanel5Layout);
+        jPanel5Layout.setHorizontalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jLabel4, javax.swing.GroupLayout.PREFERRED_SIZE, 110, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(jLabelSelectedRoute, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
+        );
+        jPanel5Layout.setVerticalGroup(
+            jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel5Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel5Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addComponent(jLabel4, javax.swing.GroupLayout.DEFAULT_SIZE, 28, Short.MAX_VALUE)
+                    .addComponent(jLabelSelectedRoute, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                .addContainerGap())
+        );
+
         javax.swing.GroupLayout cpPanelLayout = new javax.swing.GroupLayout(cpPanel);
         cpPanel.setLayout(cpPanelLayout);
         cpPanelLayout.setHorizontalGroup(
             cpPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane2)
+            .addComponent(jScrollPane2, javax.swing.GroupLayout.Alignment.TRAILING)
+            .addComponent(jPanel5, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
         );
         cpPanelLayout.setVerticalGroup(
             cpPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 262, Short.MAX_VALUE)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, cpPanelLayout.createSequentialGroup()
+                .addComponent(jPanel5, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jScrollPane2, javax.swing.GroupLayout.DEFAULT_SIZE, 226, Short.MAX_VALUE))
         );
 
         jTextFieldVehicleUUIDtoSend.setText("Inserisci UUID Veicolo");
@@ -359,7 +431,7 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        jTextFieldCapacityToSend.setText("Inserisci capacit� raccolta (in litri)");
+        jTextFieldCapacityToSend.setText("Inserisci capacit� raccolta (in litri)");
         jTextFieldCapacityToSend.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 jTextFieldCapacityToSendFocusLost(evt);
@@ -396,7 +468,7 @@ public class MainFrame extends javax.swing.JFrame {
                     .addComponent(jTextFieldVehicleUUIDtoSend, javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jTextFieldCapacityToSend, javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jTextFieldCollectionPointFromtoSend, javax.swing.GroupLayout.Alignment.LEADING))
-                .addGap(99, 99, 99))
+                .addContainerGap())
         );
         jPanel3Layout.setVerticalGroup(
             jPanel3Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
@@ -409,10 +481,10 @@ public class MainFrame extends javax.swing.JFrame {
                 .addComponent(jTextFieldCollectionPointFromtoSend, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jComboBoxTypeOfDisposal, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addContainerGap(25, Short.MAX_VALUE))
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        jPanel4.setLayout(new java.awt.GridBagLayout());
+        jPanel6.setLayout(new java.awt.GridBagLayout());
 
         jButtonSEND.setFont(new java.awt.Font("Segoe UI", 0, 24)); // NOI18N
         jButtonSEND.setText("INVIA");
@@ -422,7 +494,83 @@ public class MainFrame extends javax.swing.JFrame {
                 jButtonSENDActionPerformed(evt);
             }
         });
-        jPanel4.add(jButtonSEND, new java.awt.GridBagConstraints());
+        jPanel6.add(jButtonSEND, new java.awt.GridBagConstraints());
+
+        jLabel5.setText("Rubbish Dump id:");
+
+        jLabel6.setText("Static Timestamp:");
+
+        jLabel7.setText("Depot id:");
+
+        jLabel8.setText("Type of Disposal:");
+
+        javax.swing.GroupLayout jPanel7Layout = new javax.swing.GroupLayout(jPanel7);
+        jPanel7.setLayout(jPanel7Layout);
+        jPanel7Layout.setHorizontalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabelStaticTimestamp, javax.swing.GroupLayout.DEFAULT_SIZE, 344, Short.MAX_VALUE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabelTypeOfDisposal, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabelDepotID, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 106, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabelRubbishDumpID, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)))
+                .addContainerGap())
+        );
+        jPanel7Layout.setVerticalGroup(
+            jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel7Layout.createSequentialGroup()
+                .addContainerGap()
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                            .addComponent(jLabel6, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabelStaticTimestamp, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                            .addComponent(jLabel7, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(jLabelDepotID, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                        .addComponent(jLabel5, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel7Layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(jLabelRubbishDumpID, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                .addGap(10, 10, 10)
+                .addGroup(jPanel7Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                    .addComponent(jLabel8, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jLabelTypeOfDisposal, javax.swing.GroupLayout.PREFERRED_SIZE, 30, javax.swing.GroupLayout.PREFERRED_SIZE)))
+        );
+
+        javax.swing.GroupLayout jPanel4Layout = new javax.swing.GroupLayout(jPanel4);
+        jPanel4.setLayout(jPanel4Layout);
+        jPanel4Layout.setHorizontalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jPanel6, javax.swing.GroupLayout.PREFERRED_SIZE, 130, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(18, 18, 18)
+                .addComponent(jPanel7, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
+        );
+        jPanel4Layout.setVerticalGroup(
+            jPanel4Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(jPanel4Layout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jPanel6, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addContainerGap())
+            .addComponent(jPanel7, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+        );
 
         javax.swing.GroupLayout disposalPanelLayout = new javax.swing.GroupLayout(disposalPanel);
         disposalPanel.setLayout(disposalPanelLayout);
@@ -432,7 +580,7 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addComponent(jPanel3, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, 537, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(jPanel4, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
         );
         disposalPanelLayout.setVerticalGroup(
@@ -534,7 +682,7 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap()
                 .addComponent(connectionPanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addComponent(routePanel, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(routePanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(cpPanel, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
@@ -638,7 +786,7 @@ public class MainFrame extends javax.swing.JFrame {
         JTable t = (JTable) evt.getSource();
         int row = t.getSelectedRow();
         //int column = t.getSelectedColumn();
-        String s = (String) t.getValueAt(row, 0);
+        String s = (String) t.getValueAt(row, 1);
         jTextFieldCollectionPointFromtoSend.setText(s);
     }//GEN-LAST:event_jTableCPMouseClicked
 
@@ -661,8 +809,30 @@ public class MainFrame extends javax.swing.JFrame {
         String vehicleID = jTextFieldVehicleUUIDtoSend.getText();
         String capacity = jTextFieldCapacityToSend.getText();
         String cpID = jTextFieldCollectionPointFromtoSend.getText();
+        if(cpID.equals(depotID)){
+            JOptionPane.showMessageDialog(null, "Il collection point selezionato è il deposito.\nNon è possibile inviare disposal da tale punto.", "Errore", JOptionPane.ERROR_MESSAGE);
+            return;
+        }else if(cpID.equals(rubbishDumpID)){
+            JOptionPane.showMessageDialog(null, "Il collection point selezionato è la discariac.\nNon è possibile inviare disposal da tale punto.", "Errore", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         String typeOfDisposal = (String) jComboBoxTypeOfDisposal.getSelectedItem();
         disposalGenerator.sendDisposal(typeOfDisposal, Integer.valueOf(capacity), UUID.fromString(cpID), UUID.fromString(vehicleID));
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                disposalGenerator.updateNow(selectedRoute);
+            }
+
+        }).start();
+
+
     }//GEN-LAST:event_jButtonSENDActionPerformed
 
     private void jTableRouteMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTableRouteMouseClicked
@@ -673,6 +843,8 @@ public class MainFrame extends javax.swing.JFrame {
         String s = (String) t.getValueAt(row, 0);
 
         selectedRoute = s;
+        
+        jLabelSelectedRoute.setText("");
 
         new Thread(new Runnable() {
             @Override
@@ -696,12 +868,25 @@ public class MainFrame extends javax.swing.JFrame {
     private javax.swing.JLabel jLabel1;
     private javax.swing.JLabel jLabel2;
     private javax.swing.JLabel jLabel3;
+    private javax.swing.JLabel jLabel4;
+    private javax.swing.JLabel jLabel5;
+    private javax.swing.JLabel jLabel6;
+    private javax.swing.JLabel jLabel7;
+    private javax.swing.JLabel jLabel8;
     private javax.swing.JLabel jLabelArtemisConnectionStatus;
+    private javax.swing.JLabel jLabelDepotID;
     private javax.swing.JLabel jLabelMongoConnectionStatus;
+    private javax.swing.JLabel jLabelRubbishDumpID;
+    private javax.swing.JLabel jLabelSelectedRoute;
+    private javax.swing.JLabel jLabelStaticTimestamp;
+    private javax.swing.JLabel jLabelTypeOfDisposal;
     private javax.swing.JPanel jPanel1;
     private javax.swing.JPanel jPanel2;
     private javax.swing.JPanel jPanel3;
     private javax.swing.JPanel jPanel4;
+    private javax.swing.JPanel jPanel5;
+    private javax.swing.JPanel jPanel6;
+    private javax.swing.JPanel jPanel7;
     private javax.swing.JScrollPane jScrollPane1;
     private javax.swing.JScrollPane jScrollPane2;
     private javax.swing.JSeparator jSeparator1;

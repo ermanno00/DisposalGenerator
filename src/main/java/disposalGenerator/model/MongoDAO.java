@@ -5,6 +5,7 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import disposalGenerator.configuration.Configuration;
+import disposalGenerator.model.entities.CacheEntity;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
 import disposalGenerator.model.entities.ItineraryEntity;
 import disposalGenerator.model.entities.ItineraryState;
@@ -41,6 +42,7 @@ public class MongoDAO {
         return database.getCollection(collectionName, classType);
     }
 
+
 //    public ItineraryEntity getActiveItineraryByVehicleId(UUID vehicleId) {
 //        MongoCollection<ItineraryEntity> collection =getCollection("Itineraries",ItineraryEntity.class);
 //        return collection.find(and(
@@ -72,7 +74,15 @@ public class MongoDAO {
     public List<CollectionPointStatusEntity> getCollectionPointStatusByIDIn(List<UUID> collectionPointId){
         MongoCollection<CollectionPointStatusEntity> collection =getCollection("CollectionPointsStatus", CollectionPointStatusEntity.class);
         List<CollectionPointStatusEntity>result = new ArrayList<>();
+
         return collection.find(in("_id", collectionPointId)).into(result);
+    }
+
+    public List<CacheEntity> getCacheEntity(){
+        MongoCollection<CacheEntity> collection =getCollection("cache", CacheEntity.class);
+        List<CacheEntity>result = new ArrayList<>();
+
+        return collection.find().into(result);
     }
 
     public void closeSession(){

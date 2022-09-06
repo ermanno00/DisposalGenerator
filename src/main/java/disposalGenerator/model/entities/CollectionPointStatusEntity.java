@@ -14,7 +14,7 @@ public class CollectionPointStatusEntity {
     //private UUID vehicleId;
     private int averageDemand;
     private int effectiveDemand=0;
-    private boolean isRouted;
+    private Boolean isRouted;
 
 
 }

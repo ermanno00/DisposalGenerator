@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import disposalGenerator.configuration.Configuration;
 import disposalGenerator.GUI.MainFrame;
 import disposalGenerator.model.MongoDAO;
-import disposalGenerator.model.entities.CollectionPointStatusEntity;
-import disposalGenerator.model.entities.Coordinates;
-import disposalGenerator.model.entities.ItineraryEntity;
+import disposalGenerator.model.entities.*;
 import org.apache.activemq.artemis.jms.client.ActiveMQQueueConnectionFactory;
 
 import javax.jms.*;
@@ -110,6 +108,36 @@ public class DisposalGenerator implements Runnable {
 
             callbackSet.forEach(callback -> callback.onMongoConnectionStatusChange(true));
 
+            List<CacheEntity> cacheEntities = mongoDAO.getCacheEntity();
+            String rubbishDumpId = "";
+            String depotId = "";
+            long staticTimestamp = 0;
+            String typeOfDisposal = "";
+
+            for (CacheEntity cacheEntity: cacheEntities){
+                if(cacheEntity.getId()!=null){
+                    switch (cacheEntity.getId()){
+                        case 1: {
+                            ObjectMapper ob = new ObjectMapper();
+                            ScheduleCommand sc = ob.readValue(cacheEntity.getEntity(), ScheduleCommand.class);
+                            typeOfDisposal = sc.getTypeOfDisposal();
+                            break;
+                        }
+                        case 5: staticTimestamp = Long.valueOf(cacheEntity.getEntity()); break;
+                        case 6: depotId = cacheEntity.getEntity(); break;
+                        case 7: rubbishDumpId = cacheEntity.getEntity(); break;
+                        default: break;
+                    }
+                }
+            }
+
+            String finalRubbishDumpId = rubbishDumpId;
+            String finalDepotId = depotId;
+            long finalStaticTimestamp = staticTimestamp;
+            String finalTypeOfDisposal = typeOfDisposal;
+            callbackSet.forEach(callback -> callback.onEnvironmentData(finalRubbishDumpId, finalDepotId, finalStaticTimestamp, finalTypeOfDisposal));
+
+
             scheduler = Executors.newScheduledThreadPool(1);
             scheduler.scheduleAtFixedRate(() -> {
                 callbackSet.forEach(callback -> callback.onRescheduledUpdateData(Configuration.pollingTime));
@@ -140,8 +168,26 @@ public class DisposalGenerator implements Runnable {
                 ItineraryEntity itinerary = itineraries.stream().filter(itineraryEntity -> itineraryEntity.getId().equals(UUID.fromString(routeId))).findFirst().get();
 
                 List<CollectionPointStatusEntity> collectionPointStatusEntities = mongoDAO.getCollectionPointStatusByIDIn(itinerary.getServedNodes());
+
+                LinkedList<CollectionPointStatusEntity> ordered = new LinkedList<>();
+                for(UUID id: itinerary.getServedNodes()){
+
+                    Optional<CollectionPointStatusEntity> optionalCollectionPointStatusEntity = collectionPointStatusEntities.stream().filter(collectionPointStatusEntity -> collectionPointStatusEntity.getId().equals(id)).findFirst();
+
+                    if(optionalCollectionPointStatusEntity.isPresent()){
+                        ordered.add(collectionPointStatusEntities.stream().filter(collectionPointStatusEntity -> collectionPointStatusEntity.getId().equals(id)).findFirst().get());
+                    }else{
+                        CollectionPointStatusEntity collectionPointStatus = new CollectionPointStatusEntity();
+                        collectionPointStatus.setId(id);
+                        collectionPointStatus.setIsRouted(true);
+                        ordered.add(collectionPointStatus);
+                    }
+
+                }
+
+
                 log.info("Collection point trovati: "+collectionPointStatusEntities.size());
-                callbackSet.forEach(callback -> callback.onCollectionPoint(collectionPointStatusEntities));
+                callbackSet.forEach(callback -> callback.onCollectionPoint(ordered));
             }
             log.info("Pronto per una nuova ricerca");
             callbackSet.forEach(callback -> callback.onRescheduledUpdateData(-101));
