@@ -16,11 +16,13 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableModel;
 
 import disposalGenerator.configuration.Constants;
+import disposalGenerator.configuration.Utils;
 import disposalGenerator.disposal.DisposalGenerator;
 import disposalGenerator.disposal.DisposalGeneratorCallback;
 import disposalGenerator.model.entities.CollectionPointStatusEntity;
 import disposalGenerator.model.entities.Coordinates;
 import disposalGenerator.model.entities.ItineraryEntity;
+import javax.swing.table.TableRowSorter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -66,6 +68,20 @@ public class MainFrame extends javax.swing.JFrame {
      */
     public MainFrame() {
         initComponents();
+        
+        TableRowSorter sorterRoute = new TableRowSorter();
+        jTableRoute.setRowSorter(sorterRoute);
+        sorterRoute.setModel(jTableRoute.getModel());
+        for(int i = 0 ; i < jTableRoute.getColumnCount() ; i++)
+            sorterRoute.setComparator(i, Utils.getComparator());
+        
+        TableRowSorter sorterCP = new TableRowSorter();
+        jTableCP.setRowSorter(sorterCP);
+        sorterCP.setModel(jTableCP.getModel());
+        for(int i = 0 ; i < jTableCP.getColumnCount() ; i++)
+            sorterCP.setComparator(i, Utils.getComparator());
+        
+        
         disposalGenerator = DisposalGenerator.getDisposalGenerator();
         disposalListener();
     }
@@ -284,6 +300,7 @@ public class MainFrame extends javax.swing.JFrame {
         jButtonUPDATENOW = new javax.swing.JButton();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setTitle("DisposalGenerator - WComp");
 
         jButtonDisconnect.setText("DISCONNETTI");
         jButtonDisconnect.setEnabled(false);
@@ -317,7 +334,6 @@ public class MainFrame extends javax.swing.JFrame {
         connectionPanelLayout.setHorizontalGroup(
             connectionPanelLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, connectionPanelLayout.createSequentialGroup()
-                .addContainerGap()
                 .addComponent(jTextFieldVehicleUUID)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addComponent(jButtonConnect, javax.swing.GroupLayout.PREFERRED_SIZE, 133, javax.swing.GroupLayout.PREFERRED_SIZE)
@@ -336,7 +352,6 @@ public class MainFrame extends javax.swing.JFrame {
                 .addContainerGap())
         );
 
-        jTableRoute.setAutoCreateRowSorter(true);
         jTableRoute.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
 
@@ -431,7 +446,7 @@ public class MainFrame extends javax.swing.JFrame {
             }
         });
 
-        jTextFieldCapacityToSend.setText("Inserisci capacità raccolta (in litri)");
+        jTextFieldCapacityToSend.setText("Inserisci volume raccolto (in litri)");
         jTextFieldCapacityToSend.addFocusListener(new java.awt.event.FocusAdapter() {
             public void focusLost(java.awt.event.FocusEvent evt) {
                 jTextFieldCapacityToSendFocusLost(evt);
@@ -764,11 +779,11 @@ public class MainFrame extends javax.swing.JFrame {
 
     private void jTextFieldCapacityToSendFocusLost(java.awt.event.FocusEvent evt) {//GEN-FIRST:event_jTextFieldCapacityToSendFocusLost
         if (jTextFieldCapacityToSend.getText().equals(""))
-            jTextFieldCapacityToSend.setText("Inserisci capacitï¿½ raccolta (in litri)");
+            jTextFieldCapacityToSend.setText("Inserisci volume raccolto (in litri)");
     }//GEN-LAST:event_jTextFieldCapacityToSendFocusLost
 
     private void jTextFieldCapacityToSendMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jTextFieldCapacityToSendMouseClicked
-        if (jTextFieldCapacityToSend.getText().equals("Inserisci capacitï¿½ raccolta (in litri)"))
+        if (jTextFieldCapacityToSend.getText().equals("Inserisci volume raccolto (in litri)"))
             jTextFieldCapacityToSend.setText("");
     }//GEN-LAST:event_jTextFieldCapacityToSendMouseClicked
 
